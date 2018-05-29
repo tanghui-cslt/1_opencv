@@ -51,10 +51,10 @@ SComplex operator * (const SComplex &c1, const SComplex &c2)
 {
 	return SComplex(c1.real*c2.real - c1.image*c2.image, c1.real*c2.image + c1.image*c2.real);
 }
-//SComplex operator = (const SComplex &c1, const SComplex &c2)
-//{
-//	return SComplex(
-//}
+SComplex operator / (const SComplex &c1, const double data)
+{
+	return SComplex(c1.real / data, c1.image / data);
+}
 ostream & operator << (ostream & os, const SComplex &c)
 {
 	os << "(" << c.real << " " << c.image << ")";
@@ -375,6 +375,73 @@ SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen,
 	return A;
 }
 
+SComplex * dft1d(SComplex *a, int len, int DFT)
+{
+	SComplex *A = new SComplex[len];
+	SComplex complex_i(0, 1);
+	for (int i = 0; i < len; i++)
+	{
+		A[i] = SComplex(0, 0);
+	}
+	//cout<<endl;
+	for (int i = 0; i < len; i++)
+	{
+		for (int j = 0; j < len; j++)
+		{
+			//cout<<(2*PI*i*j/(double)len)<<" ";
+			double theta = PI*(-2.0)*(DFT)*(double)(i*j) / (double)len;
+			SComplex temp(cos(theta), sin(theta));
+			A[i] = A[i] + a[j] * temp;
+		}
+		//cout<<" "<<i<<endl;
+	}
+	if (DFT == -1)
+	{
+		for (int i = 0; i < len; i++)
+		{
+			A[i] = A[i] / len;
+		}
+	}
+
+	return A;
+}
+SComplex ** dft2d_2(SComplex **a, int row, int col, int DFT = 1)
+{
+	double  start, end, cost;
+	start = clock();
+	SComplex **A = new SComplex*[row];
+
+
+	for (int i = 0; i < row; i++)
+	{
+		//cout<<i<<endl;
+		A[i] = dft1d(a[i], col, DFT);
+		//cout<<"------------\n";
+
+	}
+
+	SComplex  *temp = new SComplex[row];
+
+	for (int j = 0; j < col; j++)
+	{
+
+		SComplex  *fftTemp = NULL;
+		for (int i = 0; i < row; i++)
+			temp[i] = A[i][j];
+
+		fftTemp = dft1d(temp, row, DFT);
+
+		for (int i = 0; i < row; i++)
+			A[i][j] = fftTemp[i];
+
+	}
+
+	end = clock();
+	cost = (end - start)*1.0 / CLOCKS_PER_SEC;
+	cout << "times= " << cost << endl;
+	delete[] temp;
+	return A;
+}
 SComplex **Matconvert2Array(Mat image)
 {
 	int iRows = image.rows;
@@ -477,9 +544,10 @@ int main()
 	SComplex **fft = NULL;
 	
 
-	int newRow, newCol;
-	
-	fft = FFT2D(a, row, col, newRow, newCol, scale,ways);
+	int newRow = row, newCol = col;
+	//
+	fft = dft2d_2(a, row, col, 1);
+	//fft = FFT2D(a, row, col, newRow, newCol, scale,ways=1);
 	
 	//ofstream outfile("2.txt");
 	
