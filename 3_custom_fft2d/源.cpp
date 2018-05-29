@@ -1,4 +1,5 @@
 #include<iostream>
+#include <string>
 #include<fstream>
 #include<algorithm>
 #include<cmath>
@@ -306,7 +307,7 @@ SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen,
 	//getBitNum(len,scale);
 	int BitRowNum = getBitNum(row, scale);
 	int BitColNum = getBitNum(col, scale);
-	cout << "Bit = " << BitRowNum << " Bit = " << BitColNum << endl;
+	//cout << "Bit = " << BitRowNum << " Bit = " << BitColNum << endl;
 	SComplex **A = NULL;
 	//  对齐到2的次幂
 	newRowLen = pow(scale, BitRowNum);
@@ -371,7 +372,8 @@ SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen,
 	}
 	end = clock();
 	cost = (end - start) / CLOCKS_PER_SEC;
-	cout << "time1 = " << cost << endl;
+	cout << "-----快速傅里叶变换-------\n" << "row = " << newRowLen << " col = " << newColLen <<"  基底= "<<scale << " time = " << cost << endl;
+	//cout << "快速傅里叶变换时间 = " << cost << endl;
 	return A;
 }
 
@@ -438,8 +440,8 @@ SComplex ** dft2d_2(SComplex **a, int row, int col, int DFT = 1)
 
 	end = clock();
 	cost = (end - start)*1.0 / CLOCKS_PER_SEC;
-	cout << "times= " << cost << endl;
-	delete[] temp;
+	cout << "-----离散傅里叶变换-------\n"<<"row = "<<row<< " col = "<< col << " time = "<< cost << endl;
+	delete[] temp;  
 	return A;
 }
 SComplex **Matconvert2Array(Mat image)
@@ -514,54 +516,16 @@ Mat complex2Mat(SComplex **data, int row, int col)
 	delete[] doubleData;
 	return matData;
 }
-int main()
+void display_frequency(SComplex **fft, int row, int col,String name)
 {
-	Mat I = imread("14.jpg", IMREAD_GRAYSCALE);
-	//const int n = 128;
-
-	//运行fft的方式
-	int ways = 0;
-	const int row = I.rows, col = I.cols;
-	int scale = 2;
-	if (I.empty())
-	{
-		cout << "图像加载失败!" << endl;
-		return -1;
-	}
-	else
-		cout << "图像加载成功!" << endl;
-	Mat grayImg;
-	int channels = I.channels();
-	if (channels > 1)
-		cvtColor(I, grayImg, CV_BGR2GRAY);
-	else
-		grayImg = I.clone();
-	Mat doubleImg;
-	grayImg.convertTo(doubleImg, CV_64FC1, 1);
-	
-	SComplex** a = NULL;
-	a = Matconvert2Array(doubleImg);
-	SComplex **fft = NULL;
-	
-
-	int newRow = row, newCol = col;
-	//
-	fft = dft2d_2(a, row, col, 1);
-	//fft = FFT2D(a, row, col, newRow, newCol, scale,ways=1);
-	
-	//ofstream outfile("2.txt");
-	
-	Mat complexI = complex2Mat(fft, newRow, newCol);
-
-
+	Mat complexI = complex2Mat(fft, row, col);
 	Mat matData;
-	double ***doubleData = complex2double(fft, newRow, newCol);
+	double ***doubleData = complex2double(fft, row, col);
 
-	Mat mat1 = double2Mat(doubleData[0], newRow, newCol);
+	Mat mat1 = double2Mat(doubleData[0], row, col);
 	double *temp = mat1.ptr<double>(0);
 
-	Mat mat2 = double2Mat(doubleData[1], newRow, newCol);
-
+	Mat mat2 = double2Mat(doubleData[1], row, col);
 	magnitude(mat1, mat2, mat1);
 	Mat magI = mat1;
 	magI += Scalar::all(1);
@@ -594,8 +558,47 @@ int main()
 	normalize(magI, magI, 0, 1, CV_MINMAX);
 
 	//outfile << magI << endl;
+	imshow(name+"频谱图", magI);
+}
+int main()
+{
+	Mat I = imread("14.jpg", IMREAD_GRAYSCALE);
+	//const int n = 128;
+
+	//运行fft的方式 1：基底为scale，0：基底为2
+	int ways = 1;
+	const int row = I.rows, col = I.cols;
+	int scale = 5;
+	if (I.empty())
+	{
+		cout << "图像加载失败!" << endl;
+		return -1;
+	}
+	else
+		cout << "图像加载成功!" << endl;
+	Mat grayImg;
+	int channels = I.channels();
+	if (channels > 1)
+		cvtColor(I, grayImg, CV_BGR2GRAY);
+	else
+		grayImg = I.clone();
+	Mat doubleImg;
+	grayImg.convertTo(doubleImg, CV_64FC1, 1);
+	
+	SComplex** a = NULL;
+	a = Matconvert2Array(doubleImg);
+	SComplex **fft = NULL;
+	SComplex **dft = NULL;
+
+	int newRow = row, newCol = col;
+	//
+	dft = dft2d_2(a, row, col, 1);
+
+	display_frequency(dft, row, col,"dft");
+	fft = FFT2D(a, row, col, newRow, newCol, scale,ways);
+	display_frequency(fft, newRow, newCol,"fft");
+	
 	imshow("输入图像", I);
-	imshow("频谱图", magI);
 
 	waitKey(0);
 	I.release();
@@ -604,5 +607,6 @@ int main()
 	//outfile.close();
 	delete[]  a;
 	delete[] fft;
+	delete[] dft;
 	return 0;
 }
