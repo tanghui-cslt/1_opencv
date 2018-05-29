@@ -51,9 +51,9 @@ SComplex operator * (const SComplex &c1, const SComplex &c2)
 {
 	return SComplex(c1.real*c2.real - c1.image*c2.image, c1.real*c2.image + c1.image*c2.real);
 }
-//Complex operator = (const Complex &c1, const Complex &c2)
+//SComplex operator = (const SComplex &c1, const SComplex &c2)
 //{
-//	return Complex(
+//	return SComplex(
 //}
 ostream & operator << (ostream & os, const SComplex &c)
 {
@@ -133,6 +133,75 @@ int * transBit(int len, int scale)
 	return data;
 }
 // 计算FFT flag = 1表示列 flag = 0 表示行
+SComplex ** FFT(SComplex **a, int id, int row, int col, int flag)
+{
+	SComplex * temp = NULL;
+	int len = 0;
+	if (flag == 1)
+	{
+		len = row;
+		temp = new SComplex[row];
+		for (int i = 0; i < row; i++)
+		{
+			temp[i] = a[i][id];
+		}
+	}
+	else if (flag == 0)
+	{
+		len = col;
+		temp = new SComplex[col];
+		for (int i = 0; i < col; i++)
+		{
+			temp[i] = a[id][i];
+		}
+
+	}
+
+	else
+	{
+		cout << "error! can't indicate row or col\n";
+		exit(1);
+	}
+
+	for (int s = 1; (1 << s) <= len; s++)
+	{
+		int m = (1 << s);
+		int interval = (m >> 1);
+		SComplex wm = SComplex(cos(-2 * PI / m), sin(-2 * PI / m));
+		for (int k = 0; k < len; k += m)
+		{
+			SComplex w = SComplex(1, 0);
+			for (int j = 0; j < interval; j++)
+			{
+				SComplex t = w*temp[k + j + interval];
+				SComplex u = temp[k + j];
+
+				temp[k + j] = u + t;
+				temp[k + j + interval] = u - t;
+				w = w*wm;
+			}
+		}
+	}
+
+	if (flag == 1)
+	{
+		for (int i = 0; i < row; i++)
+		{
+			a[i][id] = temp[i];
+		}
+	}
+	else
+	{
+		for (int i = 0; i < col; i++)
+		{
+			a[id][i] = temp[i];
+		}
+	}
+
+	delete[] temp;
+	return a;
+}
+// 计算FFT flag = 1表示列 flag = 0 表示行
 SComplex** FFT_any_base(SComplex** a, int id, int row, int col, int flag, int scale)
 {
 	SComplex * A = NULL;
@@ -185,7 +254,7 @@ SComplex** FFT_any_base(SComplex** a, int id, int row, int col, int flag, int sc
 			{
 				//wt表示外部的运算。
 				//coeff = -2*PI*j*iter_times/len;
-				//Complex wt = Complex(cos(coeff),sin(coeff));
+				//SComplex wt = SComplex(cos(coeff),sin(coeff));
 
 				iter_times++;
 				for (int i = 0; i < scale; i++)
@@ -231,7 +300,7 @@ SComplex** FFT_any_base(SComplex** a, int id, int row, int col, int flag, int sc
 	return a;
 }
 
-SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen, int scale = 2)//对长度为len(2的幂)的数组进行DFT变换
+SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen, int scale = 2,int ways = 1)//对长度为len(2的幂)的数组进行DFT变换
 {
 	double start, end, cost;
 	//getBitNum(len,scale);
@@ -285,16 +354,20 @@ SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen,
 	//计算每一列的fft 
 	for (int i = 0; i < newColLen; i++)
 	{
-		A = FFT_any_base(A, i, newRowLen, newColLen, 1, scale);
-		//A = FFT(A,i,newRowLen, newColLen,1);
+		if (ways == 1)
+			A = FFT_any_base(A, i, newRowLen, newColLen, 1, scale);
+		else
+			A = FFT(A,i,newRowLen, newColLen,1);
 	}
 
 
 	//计算每一行的fft
 	for (int i = 0; i < newRowLen; i++)
 	{
-		A = FFT_any_base(A, i, newRowLen, newColLen, 0, scale);
-		//A = FFT(A,i,newRowLen,newColLen,0);
+		if(ways == 1)
+			A = FFT_any_base(A, i, newRowLen, newColLen, 0, scale);
+		else
+			A = FFT(A,i,newRowLen,newColLen,0);
 	}
 	end = clock();
 	cost = (end - start) / CLOCKS_PER_SEC;
@@ -378,8 +451,11 @@ int main()
 {
 	Mat I = imread("14.jpg", IMREAD_GRAYSCALE);
 	//const int n = 128;
+
+	//运行fft的方式
+	int ways = 0;
 	const int row = I.rows, col = I.cols;
-	int scale = 16;
+	int scale = 2;
 	if (I.empty())
 	{
 		cout << "图像加载失败!" << endl;
@@ -402,9 +478,10 @@ int main()
 	
 
 	int newRow, newCol;
-	fft = FFT2D(a, row, col, newRow, newCol, scale);
 	
-	ofstream outfile("2.txt");
+	fft = FFT2D(a, row, col, newRow, newCol, scale,ways);
+	
+	//ofstream outfile("2.txt");
 	
 	Mat complexI = complex2Mat(fft, newRow, newCol);
 
@@ -448,7 +525,7 @@ int main()
 	//归一化处理，用0-1之间的浮点数将矩阵变换为可视的图像格式
 	normalize(magI, magI, 0, 1, CV_MINMAX);
 
-	outfile << magI << endl;
+	//outfile << magI << endl;
 	imshow("输入图像", I);
 	imshow("频谱图", magI);
 
@@ -456,7 +533,7 @@ int main()
 	I.release();
 	grayImg.release();
 	doubleImg.release();
-	outfile.close();
+	//outfile.close();
 	delete[]  a;
 	delete[] fft;
 	return 0;
