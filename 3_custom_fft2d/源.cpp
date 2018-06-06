@@ -133,6 +133,23 @@ int * transBit(int len, int scale)
 	delete[] new_data;
 	return data;
 }
+int *rev(int row)
+{
+	int *ret = new int[row];
+	for (int i = 0; i < row; i++)
+	{
+		ret[0] = 0;
+	}
+	for (int k = 0; k < row; k++)
+	{
+		for (int i = 0; (1 << i) < row; i++)
+		{
+			ret[k] <<= 1;
+			if (k & (1 << i)) ret[k] |= 1;
+		}
+	}
+	return ret;
+}
 // 计算FFT flag = 1表示列 flag = 0 表示行
 SComplex ** FFT(SComplex **a, int id, int row, int col, int flag)
 {
@@ -141,9 +158,11 @@ SComplex ** FFT(SComplex **a, int id, int row, int col, int flag)
 	if (flag == 1)
 	{
 		len = row;
+		int *new_index = rev(row);
 		temp = new SComplex[row];
 		for (int i = 0; i < row; i++)
 		{
+			//temp[new_index[i]] = a[i][id];
 			temp[i] = a[i][id];
 		}
 	}
@@ -301,9 +320,10 @@ SComplex** FFT_any_base(SComplex** a, int id, int row, int col, int flag, int sc
 	return a;
 }
 
-SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen, int scale = 2,int ways = 1)//对长度为len(2的幂)的数组进行DFT变换
+SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen, int scale = 2, int ways = 1)//对长度为len(2的幂)的数组进行DFT变换
 {
 	double start, end, cost;
+	if (ways == 0)	scale = 2;
 	//getBitNum(len,scale);
 	int BitRowNum = getBitNum(row, scale);
 	int BitColNum = getBitNum(col, scale);
@@ -358,21 +378,33 @@ SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen,
 		if (ways == 1)
 			A = FFT_any_base(A, i, newRowLen, newColLen, 1, scale);
 		else
-			A = FFT(A,i,newRowLen, newColLen,1);
+		{
+			A = FFT(A, i, newRowLen, newColLen, 1);
+			//cout << "----------------\n";
+			//cout << i<<" "<<newRowLen << endl;
+		}
 	}
 
 
 	//计算每一行的fft
 	for (int i = 0; i < newRowLen; i++)
 	{
-		if(ways == 1)
+		if (ways == 1)
 			A = FFT_any_base(A, i, newRowLen, newColLen, 0, scale);
 		else
-			A = FFT(A,i,newRowLen,newColLen,0);
+			A = FFT(A, i, newRowLen, newColLen, 0);
 	}
 	end = clock();
 	cost = (end - start) / CLOCKS_PER_SEC;
-	cout << "-----快速傅里叶变换-------\n" << "row = " << newRowLen << " col = " << newColLen <<"  基底= "<<scale << " time = " << cost << endl;
+	if (ways == 1)
+	{
+		cout << "-----快速傅里叶变换-------\n" << "row = " << newRowLen << " col = " << newColLen << "  基底= " << scale << " time = " << cost << endl;
+	}
+	else
+	{
+
+		cout << "-----快速傅里叶变换-------\n" << "row = " << newRowLen << " col = " << newColLen << "  基底= " << 2 << " time = " << cost << endl;
+	}
 	//cout << "快速傅里叶变换时间 = " << cost << endl;
 	return A;
 }
@@ -440,8 +472,8 @@ SComplex ** dft2d_2(SComplex **a, int row, int col, int DFT = 1)
 
 	end = clock();
 	cost = (end - start)*1.0 / CLOCKS_PER_SEC;
-	cout << "-----离散傅里叶变换-------\n"<<"row = "<<row<< " col = "<< col << " time = "<< cost << endl;
-	delete[] temp;  
+	cout << "-----离散傅里叶变换-------\n" << "row = " << row << " col = " << col << " time = " << cost << endl;
+	delete[] temp;
 	return A;
 }
 SComplex **Matconvert2Array(Mat image)
@@ -469,7 +501,7 @@ SComplex **Matconvert2Array(Mat image)
 double *** complex2double(SComplex **data, int row, int col)
 {
 	double *** temp = new double **[2];
-	
+
 	temp[0] = new double *[row];
 	temp[1] = new double *[row];
 	for (int i = 0; i < row; i++)
@@ -491,13 +523,13 @@ Mat double2Mat(double **data, int M, int N)
 	for (int i = 0; i < M; i++)
 	{
 		double *temp = image.ptr<double>(i);
-		for (int j  = 0; j < N; j++)
+		for (int j = 0; j < N; j++)
 		{
 			temp[j] = data[i][j];
 		}
 	}
 
-	
+
 	return image;
 }
 Mat complex2Mat(SComplex **data, int row, int col)
@@ -508,7 +540,7 @@ Mat complex2Mat(SComplex **data, int row, int col)
 
 	Mat mat1 = double2Mat(doubleData[0], row, col);
 	double *temp = mat1.ptr<double>(0);
-	
+
 	Mat mat2 = double2Mat(doubleData[1], row, col);
 	Mat planes[] = { Mat_<double>(mat1), Mat_<double>(mat2) };
 	merge(planes, 2, matData);
@@ -516,7 +548,7 @@ Mat complex2Mat(SComplex **data, int row, int col)
 	delete[] doubleData;
 	return matData;
 }
-void display_frequency(SComplex **fft, int row, int col,String name)
+void display_frequency(SComplex **fft, int row, int col, String name)
 {
 	Mat complexI = complex2Mat(fft, row, col);
 	Mat matData;
@@ -558,17 +590,16 @@ void display_frequency(SComplex **fft, int row, int col,String name)
 	normalize(magI, magI, 0, 1, CV_MINMAX);
 
 	//outfile << magI << endl;
-	imshow(name+"频谱图", magI);
+	imshow(name + "频谱图", magI);
 }
 int main()
 {
 	Mat I = imread("14.jpg", IMREAD_GRAYSCALE);
-	//const int n = 128;
-
-	//运行fft的方式 1：基底为scale，0：基底为2
+	//ways = 0 专用的fft 基底要设为2
+	//ways = 1, 任意基底，基底任意设
 	int ways = 1;
 	const int row = I.rows, col = I.cols;
-	int scale = 5;
+	int scale = 4;
 	if (I.empty())
 	{
 		cout << "图像加载失败!" << endl;
@@ -584,7 +615,7 @@ int main()
 		grayImg = I.clone();
 	Mat doubleImg;
 	grayImg.convertTo(doubleImg, CV_64FC1, 1);
-	
+
 	SComplex** a = NULL;
 	a = Matconvert2Array(doubleImg);
 	SComplex **fft = NULL;
@@ -593,11 +624,11 @@ int main()
 	int newRow = row, newCol = col;
 	//
 	dft = dft2d_2(a, row, col, 1);
+	display_frequency(dft, row, col, "dft");
 
-	display_frequency(dft, row, col,"dft");
-	fft = FFT2D(a, row, col, newRow, newCol, scale,ways);
-	display_frequency(fft, newRow, newCol,"fft");
-	
+	fft = FFT2D(a, row, col, newRow, newCol, scale, ways);
+	display_frequency(fft, newRow, newCol, "fft");
+
 	imshow("输入图像", I);
 
 	waitKey(0);
