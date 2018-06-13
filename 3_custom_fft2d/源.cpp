@@ -138,7 +138,7 @@ int *rev(int row)
 	int *ret = new int[row];
 	for (int i = 0; i < row; i++)
 	{
-		ret[0] = 0;
+		ret[i] = 0;
 	}
 	for (int k = 0; k < row; k++)
 	{
@@ -148,6 +148,17 @@ int *rev(int row)
 			if (k & (1 << i)) ret[k] |= 1;
 		}
 	}
+	
+	return ret;
+}
+int rev(int id, int row)
+{
+	int ret = 0;
+	for (int i = 0; (1 << i) < row; i++)
+	{
+		ret <<= 1;
+		if (id & (1 << i)) ret |= 1;
+	}
 	return ret;
 }
 // 计算FFT flag = 1表示列 flag = 0 表示行
@@ -155,13 +166,15 @@ SComplex ** FFT(SComplex **a, int id, int row, int col, int flag)
 {
 	SComplex * temp = NULL;
 	int len = 0;
+	//cout << "aaaaaaaa\n";
 	if (flag == 1)
 	{
 		len = row;
-		int *new_index = rev(row);
 		temp = new SComplex[row];
+		//cout  << " " << new_index[0] << " " <<new_index[1]<< endl;
 		for (int i = 0; i < row; i++)
 		{
+			//cout << "i = " << i << " " << new_index[i] << endl;
 			//temp[new_index[i]] = a[i][id];
 			temp[i] = a[i][id];
 		}
@@ -169,6 +182,7 @@ SComplex ** FFT(SComplex **a, int id, int row, int col, int flag)
 	else if (flag == 0)
 	{
 		len = col;
+		
 		temp = new SComplex[col];
 		for (int i = 0; i < col; i++)
 		{
@@ -319,7 +333,33 @@ SComplex** FFT_any_base(SComplex** a, int id, int row, int col, int flag, int sc
 	delete[] A;
 	return a;
 }
+SComplex ** swapRow(SComplex **A, int id, int newid, int row, int col)
+{
+	SComplex * temp = new SComplex[col];
 
+	for (int i = 0; i < col; i++)
+	{
+		temp[i] = A[id][i];
+		A[id][i] = A[newid][i];
+		A[newid][i] = temp[i];
+	}
+	delete[] temp;
+	return A;
+}
+
+SComplex ** swapCol(SComplex **A, int id, int newid, int row, int col)
+{
+	SComplex * temp = new SComplex[row];
+
+	for (int i = 0; i < row; i++)
+	{
+		temp[i] = A[i][id];
+		A[i][id] = A[i][newid];
+		A[i][newid] = temp[i];
+	}
+	delete[] temp;
+	return A;
+}
 SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen, int scale = 2, int ways = 1)//对长度为len(2的幂)的数组进行DFT变换
 {
 	double start, end, cost;
@@ -372,6 +412,22 @@ SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen,
 	{
 		testCol[i] = true;
 	}
+	if (ways == 0)
+	{
+		//交换列
+		for (int i = 0; i < newRowLen; i++)
+		{
+			if (!testCol[i])//交换过的列，就不再交换
+				continue;
+
+			int newCol = rev(i, newColLen);
+			testCol[i] = false;
+			testCol[newCol] = false;
+
+			//cout << i << " " << newCol << endl;
+			A = swapCol(A, i, newCol, newRowLen, newColLen);
+		}
+	}
 	//计算每一列的fft 
 	for (int i = 0; i < newColLen; i++)
 	{
@@ -379,20 +435,34 @@ SComplex** FFT2D(SComplex** a, int row, int col, int &newRowLen, int &newColLen,
 			A = FFT_any_base(A, i, newRowLen, newColLen, 1, scale);
 		else
 		{
-			A = FFT(A, i, newRowLen, newColLen, 1);
+			A = FFT(A, i, newRowLen, newColLen, 0);
 			//cout << "----------------\n";
 			//cout << i<<" "<<newRowLen << endl;
 		}
 	}
 
+	if (ways == 0)
+	{
+		//交换行
+		for (int i = 0; i < newColLen; i++)
+		{
+			if (!testRow[i])//交换过的行，就不再交换
+				continue;
 
+			int newRow = rev(i, newRowLen);
+			testRow[i] = false;
+			testRow[newRow] = false;
+			A = swapRow(A, i, newRow, newRowLen, newColLen);
+
+		}
+	}
 	//计算每一行的fft
 	for (int i = 0; i < newRowLen; i++)
 	{
 		if (ways == 1)
 			A = FFT_any_base(A, i, newRowLen, newColLen, 0, scale);
 		else
-			A = FFT(A, i, newRowLen, newColLen, 0);
+			A = FFT(A, i, newRowLen, newColLen, 1);
 	}
 	end = clock();
 	cost = (end - start) / CLOCKS_PER_SEC;
@@ -594,12 +664,12 @@ void display_frequency(SComplex **fft, int row, int col, String name)
 }
 int main()
 {
-	Mat I = imread("14.jpg", IMREAD_GRAYSCALE);
+	Mat I = imread("15.jpg", IMREAD_GRAYSCALE);
 	//ways = 0 专用的fft 基底要设为2
 	//ways = 1, 任意基底，基底任意设
-	int ways = 1;
+	int ways = 0;
 	const int row = I.rows, col = I.cols;
-	int scale = 4;
+	int scale = 2;
 	if (I.empty())
 	{
 		cout << "图像加载失败!" << endl;
@@ -623,11 +693,15 @@ int main()
 
 	int newRow = row, newCol = col;
 	//
-	dft = dft2d_2(a, row, col, 1);
-	display_frequency(dft, row, col, "dft");
+	//dft = dft2d_2(a, row, col, 1);
+	//display_frequency(dft, row, col, "dft");
 
 	fft = FFT2D(a, row, col, newRow, newCol, scale, ways);
 	display_frequency(fft, newRow, newCol, "fft");
+
+
+	fft = FFT2D(a, row, col, newRow, newCol, scale, 1);
+	display_frequency(fft, newRow, newCol, "any radix fft");
 
 	imshow("输入图像", I);
 
